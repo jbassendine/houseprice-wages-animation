@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Document</title>
+  <style>
+  .localDistricts {
+    fill: steelblue;
+    stroke: black;
+  }
+  </style>
+</head>
+<body>
+
+</body>
+<script src='lib/d3.js'></script>
+<script src='lib/topojson.js'></script>
+<script src='lib/d3-queue.js'></script>
+<script>
+
+var initialize = function() {
+  setupMap();
+  loadData();
+}
+
+var setupMap = function() {
+  var width = 800;
+  var height = 600;
+
+  // var projection = d3.geo.albers();
+  var projection = d3.geo.albers()   // define our projection with parameters
+    //.precision()
+    .scale(6000)
+    //.translate([-800, 800])
+    .rotate(90)
+    .center([1, 53.5]);
+
+  path = d3.geo.path().projection(projection);
+
+  svg = d3.select('body')
+        .append('svg')
+        .attr('height', height)
+        .attr('width', width);
+}
+
+var loadData = function() {
+  d3_queue.queue().defer(d3.csv, 'median-price-cut.csv')
+         .defer(d3.json, 'topo-lad.json')
+         .await(function(error, houseData, localDistricts) {
+           processData(houseData, localDistricts);
+         });
+}
+
+var processData = function(houseData, localDistricts) {
+
+  dataset = topojson.feature(localDistricts, localDistricts.objects.lad).features;
+
+  var min = 0,
+      max = 0;
+
+  houseData.forEach(function(HDcurrentValue) {
+    dataset.forEach(function(LDcurrentValue) {
+      if (LDcurrentValue.id === HDcurrentValue.ID) {
+        delete HDcurrentValue.ID;
+        delete HDcurrentValue['Local authority'];
+        LDcurrentValue.pricingRatioData = HDcurrentValue;
+        Object.keys(HDcurrentValue).forEach(function(key) {
+          if (HDcurrentValue.key > max) max = HDcurrentValue.key;
+          if (HDcurrentValue.key < min) min = HDcurrentValue.key;
+        })
+      }
+    });
+  });
+
+  ratioScale = d3.scale.linear()
+                    .domain([min, max])
+                    .range(['green', 'red']);
+
+  bindAndDrawMap();
+}
+
+var bindAndDrawMap = function() {
+
+  svg.selectAll('.localDistricts')
+    .data(dataset)
+    .enter()
+    .append('path')
+    .attr('class', 'localDistricts')
+    .attr('id', function(d) {return d.id})
+    .attr('d', path);
+
+  startAnimationTimer();
+}
+
+var fillColourOnRatio = function(ratio) {
+  console.log(ratioScale(ratio));
+  return ratioScale(ratio);
+}
+
+var startAnimationTimer = function() {
+  var timer = setInterval(function() {
+    if (currentYear < 2014) currentYear++;
+    animationStep();
+  }, 1000)
+}
+
+var animationStep = function() {
+  svg.selectAll('.localDistricts')
+    .data(dataset)
+    .transition()
+    .duration(500)
+    .attr('fill-opacity', function(d) {
+      return fillColourOnRatio(d.pricingRatioData[currentYear]);
+    })
+}
+
+window.onload = initialize();
+var svg, path, currentYear = 1997, ratioScale, dataset;
+
+</script>
+</html>
