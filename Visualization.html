@@ -5,30 +5,99 @@
   <title>Document</title>
   <style>
   .localDistricts {
-    fill: steelblue;
+    stroke: white;
+    stroke-width: 0.5;
+  }
+  .selected {
     stroke: black;
+    stroke-width: 2;
+  }
+  .year-text {
+    font-size: 3em;
+  }
+  .year-text {
+    font-size: 1.5em;
+  }
+  .map-div,
+  .EandW-div,
+  .lad-div {
+    float:left;
+  }
+  .EandW-chart-path {
+    stroke: red;
+    stroke-width: 5;
+    fill: none;
+  }
+  .lad-chart-path {
+    stroke: red;
+    stroke-width: 5;
+    fill: none;
   }
   </style>
 </head>
 <body>
-
+  <div class='year-text'>Year: <span id='year'>1997</span></div>
+  <div><div class="map-div"></div></div>
+  <div class="EandW-div">
+    <h2>England and Wales</h2>
+    <div class="EandW-chart-div"></div>
+    <div><span class="EandW-housing-ratio"></span> years of the median wage to buy a median house.</div>
+    <div><span class="EandW-mortgage-payoff-period"></span> years to pay off a mortgage.</div>
+  </div>
+  <div class="lad-div">
+    <h2><span id='lad'>Accept geolocation or click on map to get local data.</span></h2>
+    <div class="lad-chart-div"></div>
+    <div><span class="lad-housing-ratio"></span> years of the median wage to buy a median house.</div>
+    <div><span class="lad-mortgage-payoff-period"></span> years to pay off a mortgage.</div>
+  </div>
 </body>
 <script src='lib/d3.js'></script>
 <script src='lib/topojson.js'></script>
 <script src='lib/d3-queue.js'></script>
 <script>
 
+var svg,
+    path,
+    currentlySelected = {},
+    ratioScale,
+    projection,
+    lineFct,
+    dataset,
+    EandWData,
+    LADData,
+    currentYear = 1997,
+    stepTiming = 500,
+    timer,
+    mapWidth = 550,
+    mapHeight = 600,
+    chartMargin = {top: 20, right: 20, bottom: 50, left: 70}
+    chartWidth = 330,
+    chartHeight = 230;
+
+d3.selection.prototype.moveToFront = function() {
+  return this.each(function(){
+    this.parentNode.appendChild(this);
+  });
+};
+
 var initialize = function() {
   setupMap();
   loadData();
+
+  if ("geolocation" in navigator) {
+    navigator.geolocation.getCurrentPosition(function(position) {
+      var LADElement = returnSVGFromPoint(position.coords.latitude, position.coords.longitude);
+      updateLADChart(LADElement);
+    });
+  }
 }
 
 var setupMap = function() {
-  var width = 800;
-  var height = 600;
+  var width = mapWidth;
+  var height = mapHeight;
 
   // var projection = d3.geo.albers();
-  var projection = d3.geo.albers()   // define our projection with parameters
+  projection = d3.geo.albers()   // define our projection with parameters
     //.precision()
     .scale(6000)
     //.translate([-800, 800])
@@ -37,47 +106,272 @@ var setupMap = function() {
 
   path = d3.geo.path().projection(projection);
 
-  svg = d3.select('body')
+  svg = d3.select('.map-div')
         .append('svg')
         .attr('height', height)
-        .attr('width', width);
+        .attr('width', width)
+        .append('g');
+}
+
+var setupEandWChart = function() {
+  var EandWSVG = d3.select('.EandW-chart-div').append('svg')
+                     .attr('class', 'EandW-chart-svg')
+                     .attr("width", chartWidth + chartMargin.left + chartMargin.right)
+                     .attr("height", chartHeight + chartMargin.top + chartMargin.bottom);
+
+  var EandWXScale = d3.scale.linear()
+                              .domain(['1997','2013'])
+                              .range([0, chartWidth]);
+
+  var EandWXAxis = d3.svg.axis().scale(EandWXScale);
+
+  var EandWXAxisGroup = EandWSVG.append("g")
+                                    .attr('class', 'EandW-chart-xaxis')
+                                    .attr("transform", "translate(" + (chartMargin.left - 30) + "," + (chartHeight + chartMargin.top) + ")")
+                                    .call(EandWXAxis);
+
+  var EandWYScale = d3.scale.linear()
+                              .domain([0,7.25])
+                              .range([chartHeight,0]);
+
+  var EandWYAxis = d3.svg.axis().orient("left").scale(EandWYScale);
+
+  var EandWYAxisGroup = EandWSVG.append("g")
+                                    .attr('class', 'EandW-chart-yaxis')
+                                    .attr("transform", "translate(" + (chartMargin.left - 30) + "," + chartMargin.top + ")")
+                                    .call(EandWYAxis);
+
+  EandWLineFct = d3.svg.line()
+              .x(function(d) {return EandWXScale(d.year)})
+              .y(function(d) {return EandWYScale(d.ratio)});
+
+  EandWSVG.append("path")
+            .attr("class", "EandW-chart-path")
+            .attr("transform", "translate(" + (chartMargin.left - 30) + "," + chartMargin.top + ")")
+            .attr("d", getChartLine(1998, EandWLineFct, EandWData));
+}
+
+var setupXAxisAndReturnScale = function (LADSVG, inputClass) {
+  var LADXScale = d3.scale.linear()
+                              .domain(['1999','2015'])
+                              .range([0, chartWidth]);
+
+  var LADXAxis = d3.svg.axis().scale(LADXScale);
+
+  if (!document.getElementsByClassName(inputClass).length) {
+    var LADXAxisGroup = LADSVG.append("g")
+                                      .attr('class', inputClass)
+                                      .attr("transform", "translate(" + (chartMargin.left - 30) + "," + (chartHeight + chartMargin.top) + ")")
+                                      .call(LADXAxis);
+  }
+  return LADXScale;
+}
+
+var setupYAxisAndReturnScale = function (SVG, inputClass, max) {
+  if (!max) max = 7.25;
+  var yScale = d3.scale.linear()
+                              .domain([0, max])
+                              .range([chartHeight, 0]);
+
+  var yAxis = d3.svg.axis().orient("left").scale(yScale);
+
+  if (!document.getElementsByClassName(inputClass).length) {
+    var yAxisGroup = SVG.append("g")
+                                      .attr('class', inputClass)
+                                      .attr("transform", "translate(" + (chartMargin.left - 30) + "," + chartMargin.top + ")")
+                                      .call(yAxis);
+  } else {
+    d3.select(".lad-chart-yaxis").call(yAxis);
+  }
+
+  return yScale;
+}
+
+var setupLADChart = function() {
+  var LADSVG = d3.select('.lad-chart-div').append('svg')
+                     .attr('class', 'lad-chart-svg')
+                     .attr("width", chartWidth + chartMargin.left + chartMargin.right)
+                     .attr("height", chartHeight + chartMargin.top + chartMargin.bottom);
+  setupXAxisAndReturnScale(LADSVG, 'lad-chart-xaxis');
+  setupYAxisAndReturnScale(LADSVG, 'lad-chart-yaxis');
+  LADSVG.append("path")
+           .attr("class", "lad-chart-path")
+           .attr("transform", "translate(" + (chartMargin.left - 30) + "," + chartMargin.top + ")")
+}
+
+var updateLADChart = function(SVGTargetElement) {
+  //Highlight LAD
+  if (Object.keys(currentlySelected).length !== 0) {
+    var unselectedClassList = currentlySelected.getAttribute('class').replace(new RegExp('(\\s|^)' + "selected" + '(\\s|$)', 'g'), '$2');
+    currentlySelected.setAttribute('class', unselectedClassList);
+  }
+  svg.selectAll('.localDistricts')
+    .sort(function(a,b) {
+      return (a.id == SVGTargetElement.id) - (b.id == SVGTargetElement.id);
+    })
+  document.getElementById(SVGTargetElement.id).setAttribute('class', SVGTargetElement.getAttribute('class') + ' selected');
+  currentlySelected = SVGTargetElement;
+
+  //Find ID
+  var LADElementID = SVGTargetElement.id;
+
+  var LADDataRaw = findHouseDataById(LADElementID);
+  document.getElementById('lad').innerHTML = LADDataRaw.pricingRatioData['Local authority'];
+
+  //Reformat for chart
+  LADData = reformatDataForLineFct(LADDataRaw);
+
+  //Find max
+  var max = 0;
+  max = d3.max(LADData.data, function(d) {
+    return Number(d.ratio);
+  });
+
+  var LADSVG = d3.select('.lad-chart-svg');
+  var LADXScale = setupXAxisAndReturnScale(LADSVG, 'lad-chart-xaxis');
+  var LADYScale = setupYAxisAndReturnScale(LADSVG, 'lad-chart-yaxis', max);
+
+  //Update line function
+  LADLineFct = d3.svg.line()
+              .x(function(d) {return LADXScale(d.year)})
+              .y(function(d) {return LADYScale(d.ratio)});
+
+  if (!timer) {
+    animationStep();
+  }
 }
 
 var loadData = function() {
-  d3_queue.queue().defer(d3.csv, 'median-price-cut.csv')
-         .defer(d3.json, 'topo-lad.json')
+  d3_queue.queue().defer(d3.csv, 'data/reconstructedratioprocessed.csv')
+         .defer(d3.json, 'data/topo-lad-simplified.json')
          .await(function(error, houseData, localDistricts) {
-           processData(houseData, localDistricts);
+           processMapData(houseData, localDistricts);
          });
+
+  //  d3_queue.queue().defer(d3.csv, 'data/')
+  //         .defer(d3.json, 'topo-lad-simplified.json')
+  //         .await(function(error, houseData, localDistricts) {
+  //           processMapData(houseData, localDistricts);
+  //         });
 }
 
-var processData = function(houseData, localDistricts) {
+var findHouseDataById = function(ID) {
+  for (var i = 0; i < dataset.length; i++) {
+    var id = dataset[i].id;
+    if (ID === dataset[i].id) {
+      return dataset[i];
+    }
+  };
+  var newIndex = dataset.push({"id": ID}) - 1;
+  return dataset[newIndex];
+};
+
+var processMapData = function(houseData, localDistricts) {
 
   dataset = topojson.feature(localDistricts, localDistricts.objects.lad).features;
 
   var min = 0,
       max = 0;
 
+  // findHouseDataById = function(ID) {
+  //   for (var i = 0; i < houseData.length; i++) {
+  //     if (ID === houseData[i].ID) {
+  //       return houseData[i];
+  //     }
+  //   };
+  // };
+  //
+  // dataset.forEach(function(LDcurrentValue) {
+  //   var HDvalue = findHouseDataById(LDcurrentValue.id)
+  //   //delete HDvalue.ID;
+  //   delete HDvalue['Local authority'];
+  //   delete HDvalue[""];
+  //   LDcurrentValue.pricingRatioData = HDvalue;
+  //   // Object.keys(HDvalue).forEach(function(key) {
+  //   //   // if (key.length > 4) {
+  //   //   //   HDcurrentValue[key.substring(0,4)] = HDcurrentValue[key];
+  //   //   //   delete HDcurrentValue[key];
+  //   //   // }
+  //   //   // if (HDvalue[key] > max) max = HDvalue[key];
+  //   //   // if (HDvalue[key] < min) min = HDvalue[key];
+  //   // })
+  // });
+
   houseData.forEach(function(HDcurrentValue) {
-    dataset.forEach(function(LDcurrentValue) {
-      if (LDcurrentValue.id === HDcurrentValue.ID) {
-        delete HDcurrentValue.ID;
-        delete HDcurrentValue['Local authority'];
-        LDcurrentValue.pricingRatioData = HDcurrentValue;
-        Object.keys(HDcurrentValue).forEach(function(key) {
-          if (HDcurrentValue.key > max) max = HDcurrentValue.key;
-          if (HDcurrentValue.key < min) min = HDcurrentValue.key;
-        })
-      }
-    });
+    var LDvalue = findHouseDataById(HDcurrentValue.ID)
+    //delete HDvalue.ID;
+    delete HDcurrentValue[""];
+    LDvalue.pricingRatioData = HDcurrentValue;
+    // Object.keys(HDvalue).forEach(function(key) {
+    //   // if (key.length > 4) {
+    //   //   HDcurrentValue[key.substring(0,4)] = HDcurrentValue[key];
+    //   //   delete HDcurrentValue[key];
+    //   // }
+    //   // if (HDvalue[key] > max) max = HDvalue[key];
+    //   // if (HDvalue[key] < min) min = HDvalue[key];
+    // })
   });
 
+  EandWData = reformatDataForLineFct(findHouseDataById('K04000001'));
+
   ratioScale = d3.scale.linear()
-                    .domain([min, max])
-                    .range(['green', 'red']);
+                    .domain([0, 9.99])
+                    .range(['yellow', 'red']);
 
   bindAndDrawMap();
+  setupEandWChart();
+  setupLADChart();
 }
+
+var isPointInPoly = function (poly, pt) {
+//+ Jonas Raoni Soares Silva
+//@ http://jsfromhell.com/math/is-point-in-poly [rev. #0]
+  for(var c = false, i = -1, l = poly.length, j = l - 1; ++i < l; j = i)
+    ((poly[i][1] <= pt.y && pt.y < poly[j][1]) || (poly[j][1] <= pt.y && pt.y < poly[i][1]))
+    && (pt.x < (poly[j][0] - poly[i][0]) * (pt.y - poly[i][1]) / (poly[j][1] - poly[i][1]) + poly[i][0])
+    && (c = !c);
+  return c;
+}
+
+var returnSVGFromPoint = function (lat, lng) {
+  var PtOnSVGScale = projection([lng, lat]);//Todo match up
+  var SVGposition = svg[0][0].getBoundingClientRect();
+  return document.elementFromPoint(SVGposition.left + PtOnSVGScale[0], SVGposition.top + PtOnSVGScale[1]);
+
+  // for (var i = 0; i < dataset.length; i++) {
+  //   var test = dataset[i];
+  //   if (dataset[i].hasOwnProperty('geometry')) {
+  //     var numberOfPolygons = dataset[i].geometry.coordinates.length;
+  //     for (var j = 0; j < numberOfPolygons; j++) {
+  //       if (isPointInPoly(dataset[i].geometry.coordinates[j][0], pt)){
+  //         return dataset[i];
+  //       }
+  //     }
+  //   }
+  // }
+}
+
+var reformatDataForLineFct = function(LDvalue) {
+  var HDvalue = LDvalue.pricingRatioData;
+  var newHDvalue = {};
+  newHDvalue.data = [];
+  for (var key in HDvalue) {
+    if (HDvalue.hasOwnProperty(key)) {
+      if (key.match(/[0-9]{4}/)) {
+        newHDvalue.data.push(
+          {
+            "year": key,
+            "ratio": HDvalue[key]
+          }
+        );
+      };
+    };
+  }
+  newHDvalue.id = HDvalue.id;
+  return newHDvalue;
+}
+
+
 
 var bindAndDrawMap = function() {
 
@@ -87,35 +381,86 @@ var bindAndDrawMap = function() {
     .append('path')
     .attr('class', 'localDistricts')
     .attr('id', function(d) {return d.id})
-    .attr('d', path);
-
-  startAnimationTimer();
+    .attr('d', path)
+    .attr('fill', 'white')
+    .on("mouseover", function() {})
+    .on("mouseout", function() {})
+    .on("click", function(select) {
+      if (currentlySelected.id !== this.id) {
+        updateLADChart(this);
+      }
+    });
+  startAnimationLoop();
 }
 
 var fillColourOnRatio = function(ratio) {
-  console.log(ratioScale(ratio));
-  return ratioScale(ratio);
+  var returnColor = ratioScale(ratio);
+  if (returnColor == '#NaNNaNNaN') {
+    returnColor = 'lightgray';
+  }
+  return returnColor
 }
 
-var startAnimationTimer = function() {
-  var timer = setInterval(function() {
-    if (currentYear < 2014) currentYear++;
+var startAnimationLoop = function() {
+  timer = window.setInterval(function() {
+    document.getElementById('year').innerHTML = currentYear;
+    if (currentYear == 2013) {
+      window.clearInterval(timer);
+      timer = 0;
+      window.setTimeout(function() {
+        currentYear = 1997;
+        startAnimationLoop();
+      }, 3000)
+    } else {
+      currentYear++;
+    }
     animationStep();
-  }, 1000)
+  }, stepTiming)
+}
+
+var getChartLine = function(currentYear, lineFct, data) {
+  // var interpolate = d3.scale.quantile()
+  //   .domain([0,1])
+  //   .range(d3.range(1, EandWData.data.length + 1));
+  var interpolatedLineSegment = data.data.slice(0, currentYear - 1997);
+  interpolatedLineSegment.forEach(function(currentValue) {
+    if (isNaN(currentValue.ratio)) currentValue.ratio = 0;
+  })
+  return lineFct(interpolatedLineSegment);
+}
+
+var findYearRatio = function(data, year) {
+  var sequentialYear = currentYear - 1997;
+  return data.data.slice(sequentialYear, sequentialYear + 1)[0].ratio;
 }
 
 var animationStep = function() {
   svg.selectAll('.localDistricts')
-    .data(dataset)
     .transition()
-    .duration(500)
-    .attr('fill-opacity', function(d) {
+    .duration(stepTiming)
+    .attr('fill', function(d) {
       return fillColourOnRatio(d.pricingRatioData[currentYear]);
-    })
+    });
+
+  d3.select('.EandW-chart-path')
+     .transition()
+     .duration(stepTiming)
+     .attr('d', function() {
+       return getChartLine(currentYear, EandWLineFct, EandWData);
+     });
+  document.getElementsByClassName("EandW-housing-ratio")[0].textContent = findYearRatio(EandWData, currentYear);
+
+  if (LADData) {
+    d3.select('.lad-chart-path')
+      .transition()
+      .duration(stepTiming)
+      .attr('d', function() {
+        return getChartLine(currentYear, LADLineFct, LADData);
+      });
+  }
 }
 
 window.onload = initialize();
-var svg, path, currentYear = 1997, ratioScale, dataset;
 
 </script>
 </html>
