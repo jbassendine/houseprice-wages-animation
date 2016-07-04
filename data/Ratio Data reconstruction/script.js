@@ -64,34 +64,46 @@ fs.readFile('housingprocessed.csv', function read(err, housingdata) {
                     var incomeRow = incomeArray[rowIndex];
                     var housingRow = currentValue;
                     var ratioRow = [];
-                    var ratioObject = {};
+                    var ratioObject = {
+                      yearlyData: []
+                    };
 
                     housingRow.forEach(function(currentValue, columnIndex) {
                         if (rowIndex === 0) {
                             ratioRow[columnIndex] = housingRow[columnIndex];
                         } else if (columnIndex === 0){
                             ratioRow[columnIndex] = housingRow[columnIndex];
-                            ratioObject.ID = housingRow[columnIndex];
+                            ratioObject.LADid = housingRow[columnIndex];
                         } else if (columnIndex === 1){
                             ratioRow[columnIndex] = housingRow[columnIndex];
-                            ratioObject.LAD = housingRow[columnIndex];
+                            ratioObject.LADname = housingRow[columnIndex];
                         } else {
+                            if (housingRow[0] == "S12000005") {
+                              console.log('hit');
+                            }
                             var currentYear = columnIndex + 1996;
                             var housingCost = castToNumber(housingRow[columnIndex]);
                             var income = castToNumber(incomeRow[columnIndex]);
-                            var mortgagePeriod = 0;
-                            if (isPositiveNumber(income) && isPositiveNumber(housingCost)) mortgagePeriod = calculateMortgagePayoff(housingCost, income);
-                            ratioRow[columnIndex] = (housingCost / income);
-                            ratioObject[currentYear] = {
+                            var mortgagePeriod = 'Null';
+                            var ratio = 'Null';
+                            if (isPositiveNumber(income) && isPositiveNumber(housingCost)) {
+                              mortgagePeriod = calculateMortgagePayoff(housingCost, income);
+                              ratio = Number((housingCost / income).toFixed(2));
+                            }
+                            if (!isPositiveNumber(income)) income = 'Null';
+                            if (!isPositiveNumber(housingCost)) housingCost = 'Null';
+                            ratioRow[columnIndex] = ratio;
+                            ratioObject.yearlyData.push({
+                                "currentYear": currentYear,
                                 "housingCost": housingCost,
                                 "income": income,
-                                "mortagePeriod": mortgagePeriod,
-                                "ratio": housingCost / income
-                            };
+                                "mortgagePeriod": mortgagePeriod,
+                                "ratio": ratio
+                            });
                         }
                     });
                     var rowJSON = JSON.stringify(ratioObject);
-                    if (rowJSON) fs.writeFile("LADs/" + ratioObject.ID + ".json", rowJSON);
+                    if (rowJSON) fs.writeFile("LADs/" + ratioObject.LADid + ".json", rowJSON);
                     ratioArray.push(ratioRow);
                 });
                 console.log(ratioArray);

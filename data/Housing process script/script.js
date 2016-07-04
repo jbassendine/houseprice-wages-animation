@@ -6,7 +6,7 @@ console.log("Hello World");
 //Input is cut and pasted section from table 2a of hpssadataset11medianhousepricefornationalandsubnationalgeographiesexistingdwellingsquarterlyrollingyear.xls file
 //Years have to be added afterwards
 
-fs.readFile('niinput.csv', function read(err, data) {
+fs.readFile('enghousinginput.csv', function read(err, data) {
     if (err) {
         throw err;
     }
@@ -16,7 +16,8 @@ fs.readFile('niinput.csv', function read(err, data) {
         var annualData = [];
         var castToNumber = function (str) {
             console.log(str);
-            return Number(str.replace(/[^0-9a-z]/gi, ''));
+            if (str) return Number(str.replace(/[^0-9a-z]/gi, ''));
+            else return '-';
         };
         data.forEach(function(currentValue, rowIndex){
             var annualRow = [];
@@ -34,7 +35,7 @@ fs.readFile('niinput.csv', function read(err, data) {
         //console.log(estimateArray);
         console.log(annualData);
         csv.stringify(annualData, function(err, csvText) {
-            fs.writeFile('scothousingoutput.csv', csvText);
+            fs.writeFile('enghousingoutput.csv', csvText);
         });
     });
 });
