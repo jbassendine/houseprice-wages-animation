@@ -5,7 +5,7 @@ var HPViz_constants = {
       chartMargin: {top: 20, right: 20, bottom: 50, left: 70},
       chartWidth: 330,
       chartHeight: 230,
-      stepTiming: 1050,
+      stepTiming: 450,
       startYear: 1999,
       endYear: 2015
     };
@@ -139,6 +139,8 @@ var setupLADChart = function() {
 };
 
 var updateLADChart = function(SVGTargetElement) {
+  //Clear all rects
+  d3.selectAll('rect').remove();
   //Highlight LAD
   if (Object.keys(HPViz_context.currentlySelected).length !== 0) {
     var unselectedClassList = HPViz_context.currentlySelected.getAttribute('class').replace(new RegExp('(\\s|^)' + "selected" + '(\\s|$)', 'g'), '$2');
@@ -343,7 +345,7 @@ var bindAndDrawMap = function() {
 var fillColourOnRatio = function(ratio) {
   var returnColour = HPViz_context.ratioScale(ratio);
   if (isNaN(ratio)) {
-    returnColour = 'gray';
+    returnColour = '#ccc';
   }
   return returnColour;
 };
@@ -353,9 +355,15 @@ var startAnimationLoop = function() {
     document.getElementById('year').innerHTML = HPViz_context.currentYear;
     animationStep();
     if (HPViz_context.currentYear == HPViz_constants.endYear) {
+      //Clear timer
       window.clearInterval(HPViz_context.timer);
       HPViz_context.timer = 0;
+      //Restart timer with start year
       window.setTimeout(function() {
+        //Clear all rects
+        d3.selectAll('rect').remove();
+        //TODO:Time this up with removal of path
+
         HPViz_context.currentYear = HPViz_constants.startYear;
         startAnimationLoop();
       }, 3000);
@@ -415,7 +423,11 @@ var animationStep = function() {
 
     var elementTotalNumber = HPViz_constants.endYear - HPViz_constants.startYear + 1;
     var elementWidth = (HPViz_constants.chartWidth)/(elementTotalNumber);
-    var elementCurrentNumber = HPViz_context.currentYear - HPViz_constants.startYear - 1;
+    //var elementCurrentNumber = HPViz_context.currentYear - HPViz_constants.startYear - 1;
+
+    var calculateElementNumber = function(year) {
+      return year - HPViz_constants.startYear - 1;
+    };
 
     var nationalLineSegment = getLineSegment(HPViz_context.currentYear, HPViz_context.nationalData);
     d3.select('.national-chart-path')
@@ -436,19 +448,13 @@ var animationStep = function() {
           var key = d.ratio + d.year;
           return key;
         });
-    console.log("LadRects");
-    console.log(LadRects);
-    console.log("Exit");
-    console.log(LadRects.exit());
     LadRects.exit().remove();
-    console.log("Enter");
-    console.log(LadRects.enter());
     LadRects.enter().append('rect')
         .attr('class', "test")
         .attr('height', 230)
         .attr('width', (elementWidth))
         .attr('x', function (d) {
-          var xDisp = (elementWidth * elementCurrentNumber) - (elementWidth / 2);
+          var xDisp = (elementWidth * calculateElementNumber(d.year)) - (elementWidth / 2);
           return xDisp;
         })
         .attr('y', 0)
@@ -477,7 +483,7 @@ var animationStep = function() {
         .attr('height', 230)
         .attr('width', elementWidth)
         .attr('x', function (d) {
-          var xDisp = (elementWidth * elementCurrentNumber) - (elementWidth / 2);
+          var xDisp = (elementWidth * calculateElementNumber(d.year)) - (elementWidth / 2);
           return xDisp;
         })
         .attr('y', 0)
