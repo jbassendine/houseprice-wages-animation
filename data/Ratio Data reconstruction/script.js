@@ -81,7 +81,7 @@ fs.readFile('housingprocessed.csv', function read(err, housingdata) {
                             if (housingRow[0] == "S12000005") {
                               console.log('hit');
                             }
-                            var currentYear = columnIndex + 1996;
+                            var currentYear = columnIndex + 1997;
                             var housingCost = castToNumber(housingRow[columnIndex]);
                             var income = castToNumber(incomeRow[columnIndex]);
                             var mortgagePeriod = 'Null';
