@@ -1,14 +1,23 @@
 
 var HPViz_constants = {
-      mapWidth: 700,
-      mapHeight: 900,
-      chartMargin: {top: 20, right: 20, bottom: 50, left: 70},
-      chartWidth: 330,
-      chartHeight: 230,
-      stepTiming: 450,
-      startYear: 1999,
-      endYear: 2015
-    };
+  mapWidth: 700,
+  mapHeight: 800,
+  legendHeight: 100,
+  legendWidth: 10,
+  legendX: 700 - 250,
+  legendY: 100,
+  chartMargin: {top: 20, right: 20, bottom: 50, left: 70},
+  chartWidth: 330,
+  chartHeight: 230,
+  stepTiming: 450,
+  startYear: 1999,
+  endYear: 2015,
+  colourScaleSkeleton: [
+    {"offset": 0, "colour": 'yellow'},
+    {"offset": 0.5, "colour": 'red'},
+    {"offset": 1, "colour": 'purple'}
+  ],
+};
 
 var HPViz_context = {
   svg: {},
@@ -54,7 +63,7 @@ var setupMap = function() {
     .scale(5000)
     //.translate([-800, 800])
     .rotate(90)
-    .center([1, 57]);
+    .center([1, 56.5]);
 
   HPViz_context.path = d3.geo.path().projection(HPViz_context.projection);
 
@@ -140,7 +149,7 @@ var setupLADChart = function() {
 
 var updateLADChart = function(SVGTargetElement) {
   //Clear all rects
-  d3.selectAll('rect').remove();
+  d3.selectAll('.chart-rect').remove();
   //Highlight LAD
   if (Object.keys(HPViz_context.currentlySelected).length !== 0) {
     var unselectedClassList = HPViz_context.currentlySelected.getAttribute('class').replace(new RegExp('(\\s|^)' + "selected" + '(\\s|$)', 'g'), '$2');
@@ -199,8 +208,7 @@ var setupXAxisAndReturnScale = function (LADSVG, inputClass) {
                                       .attr('class', inputClass)
                                       .attr("transform", "translate(" + (HPViz_constants.chartMargin.left - 30) + "," + (HPViz_constants.chartHeight + HPViz_constants.chartMargin.top) + ")")
                                       .call(LADXAxis)
-
-                                      .selectAll("text")
+                                        .selectAll("text")
                                       .attr("y", 0)
                                       .attr("x", -50)
                                       .attr("dy", ".35em")
@@ -265,8 +273,10 @@ var processMapData = function(houseData, localDistricts) {
 
   HPViz_context.dataset = topojson.feature(localDistricts, localDistricts.objects.lad1).features;
 
-  var min = 0,
-      max = 0;
+  var min = 2,
+      max = 15,
+      domainArray = [],
+      rangeArray = [];
 
   houseData.forEach(function(HDcurrentValue) {
     var LDvalue = findMapDataById(HDcurrentValue.LADid);
@@ -274,9 +284,17 @@ var processMapData = function(houseData, localDistricts) {
     LDvalue.pricingRatioData = HDcurrentValue;
   });
 
+  HPViz_context.domainArray = HPViz_constants.colourScaleSkeleton.map(function(currentValue) {
+    return (currentValue.offset * (max - min) + min);
+  });
+
+  HPViz_context.rangeArray = HPViz_constants.colourScaleSkeleton.map(function(currentValue) {
+    return currentValue.colour;
+  });
+
   HPViz_context.ratioScale = d3.scale.linear()
-                    .domain([0, 9.99])
-                    .range(['yellow', 'red']);
+                    .domain(HPViz_context.domainArray)
+                    .range(HPViz_context.rangeArray);
 
   bindAndDrawMap();
   setupNationalChart();
@@ -322,7 +340,8 @@ var reformatChartDataForLineFct = function(HDvalue) {
 
 var bindAndDrawMap = function() {
 
-  HPViz_context.svg.selectAll('.localDistricts')
+  HPViz_context.svg.append('g').attr('class', 'lad-container')
+    .selectAll('.localDistricts')
     .data(HPViz_context.dataset)
     .enter()
     .append('path')
@@ -337,6 +356,59 @@ var bindAndDrawMap = function() {
         updateLADChart(this);
       }
     });
+
+  var legendContainer = HPViz_context.svg.append("g")
+                                         .attr("class", "legend-container")
+                                         .attr("transform", "translate(" + HPViz_constants.legendX + "," + HPViz_constants.legendY + ")");
+
+  legendContainer.append("rect")
+                 .attr("fill", "gray")
+                 .attr("width", HPViz_constants.legendWidth + 50)
+                 .attr("height", HPViz_constants.legendHeight + 50)
+                 .attr("transform", "translate(" + "-30" + "," + "-30" + ")");
+
+  legendContainer.append("linearGradient")
+    .attr("id", "linear-gradient")
+    .attr("x1", "0%")
+    .attr("y1", "100%")
+    .attr("x2", "0%")
+    .attr("y2", "0%")
+      .selectAll('stop').data(
+        HPViz_constants.colourScaleSkeleton.map(function(d) {
+          return {
+            "offset": d.offset * 100 + "%",
+            "colour": d.colour
+          };
+        })
+      )
+    .enter().append('stop')
+    .attr("offset", function(d) {return d.offset;})
+    .attr("stop-color", function(d) {return d.colour;});
+
+  legendContainer.append("rect")
+    .attr("width", HPViz_constants.legendWidth)
+    .attr("height", HPViz_constants.legendHeight)
+    .attr("class", "legend")
+    .style("fill", "url(#linear-gradient)");
+
+  var legendScale = d3.scale.linear()
+                          .domain(HPViz_context.domainArray.map(function(d, i) {
+                              return (i/(HPViz_context.domainArray.length-1)) * (HPViz_context.domainArray[HPViz_context.domainArray.length - 1] - HPViz_context.domainArray[0]) + HPViz_context.domainArray[0];
+                            }).reverse())
+                          .range(HPViz_constants.colourScaleSkeleton.map(function(d) {return d.offset * HPViz_constants.legendHeight;}));
+
+  console.log(HPViz_constants.colourScaleSkeleton.map(function(d) {return d.offset * HPViz_constants.legendHeight;}));
+  console.log();
+
+  var legendAxis = d3.svg.axis().orient("left")
+                           .scale(legendScale)
+                           .tickValues(HPViz_context.domainArray);
+
+  var legendAxisGroup = legendContainer.append("g")
+                                      .attr('class', "legendAxisGroup")
+                                      //.attr("transform", "translate(" + 30 + "," + 50 + ")")
+                                      .call(legendAxis);
+
   startAnimationLoop();
 
   var mapReadyEvent = new Event('mapready');
@@ -361,7 +433,7 @@ var startAnimationLoop = function() {
       //Restart timer with start year
       window.setTimeout(function() {
         //Clear all rects
-        d3.selectAll('rect').remove();
+        d3.selectAll('.chart-rect').remove();
         //TODO:Time this up with removal of path
 
         HPViz_context.currentYear = HPViz_constants.startYear;
@@ -443,14 +515,14 @@ var animationStep = function() {
     var ladLineSegment = getLineSegment(HPViz_context.currentYear, HPViz_context.LADData);
 
     var LadRects = d3.select('.lad-chart-rects')
-      .selectAll('rect')
+      .selectAll('.chart-rect')
         .data(ladLineSegment, function(d) {
           var key = d.ratio + d.year;
           return key;
         });
     LadRects.exit().remove();
     LadRects.enter().append('rect')
-        .attr('class', "test")
+        .attr('class', "chart-rect")
         .attr('height', 230)
         .attr('width', (elementWidth))
         .attr('x', function (d) {
@@ -473,13 +545,13 @@ var animationStep = function() {
       });
 
     var nationalRects = d3.select('.national-chart-rects')
-      .selectAll('rect')
+      .selectAll('.chart-rect')
         .data(nationalLineSegment, function(d) {
           var key = d.ratio + d.year;
           return key;
         });
     nationalRects.enter().append('rect')
-        .attr('class', "test")
+        .attr('class', "chart-rect")
         .attr('height', 230)
         .attr('width', elementWidth)
         .attr('x', function (d) {
