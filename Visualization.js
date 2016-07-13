@@ -2,10 +2,12 @@
 var HPViz_constants = {
   mapWidth: 700,
   mapHeight: 800,
-  legendHeight: 100,
-  legendWidth: 10,
-  legendX: 700 - 250,
-  legendY: 100,
+  legendBoxHeight: 200,
+  legendBoxWidth: 250,
+  legendHeight: 10,
+  legendWidth: 200,
+  legendX: 700 - 320,
+  legendY: 70,
   chartMargin: {top: 20, right: 20, bottom: 50, left: 70},
   chartWidth: 330,
   chartHeight: 230,
@@ -18,6 +20,9 @@ var HPViz_constants = {
     {"offset": 1, "colour": 'purple'}
   ],
 };
+
+//Calculated but only one for each client, depend on other constants or client parameters like device screen heights etc.
+HPViz_constants.legendBoxMargin = (HPViz_constants.legendBoxWidth - HPViz_constants.legendWidth)/2;
 
 var HPViz_context = {
   svg: {},
@@ -39,6 +44,30 @@ d3.selection.prototype.moveToFront = function() {
     this.parentNode.appendChild(this);
   });
 };
+
+function wrap(text, width) {
+  text.each(function() {
+    var text = d3.select(this),
+        words = text.text().split(/\s+/).reverse(),
+        word,
+        line = [],
+        lineNumber = 0,
+        lineHeight = 1.1, // ems
+        y = text.attr("y"),
+        dy = parseFloat(text.attr("dy")),
+        tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+    while (word = words.pop()) {
+      line.push(word);
+      tspan.text(line.join(" "));
+      if (tspan.node().getComputedTextLength() > width) {
+        line.pop();
+        tspan.text(line.join(" "));
+        line = [word];
+        tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+      }
+    }
+  });
+}
 
 var initialize = function() {
   setupMap();
@@ -274,7 +303,7 @@ var processMapData = function(houseData, localDistricts) {
   HPViz_context.dataset = topojson.feature(localDistricts, localDistricts.objects.lad1).features;
 
   var min = 2,
-      max = 15,
+      max = 16,
       domainArray = [],
       rangeArray = [];
 
@@ -357,21 +386,32 @@ var bindAndDrawMap = function() {
       }
     });
 
-  var legendContainer = HPViz_context.svg.append("g")
-                                         .attr("class", "legend-container")
-                                         .attr("transform", "translate(" + HPViz_constants.legendX + "," + HPViz_constants.legendY + ")");
+  var legendBoxContainer = HPViz_context.svg.append("g")
+    .attr("class", "legend-box-container")
+    .attr("transform", "translate(" + HPViz_constants.legendX + "," + HPViz_constants.legendY + ")");
 
-  legendContainer.append("rect")
-                 .attr("fill", "gray")
-                 .attr("width", HPViz_constants.legendWidth + 50)
-                 .attr("height", HPViz_constants.legendHeight + 50)
-                 .attr("transform", "translate(" + "-30" + "," + "-30" + ")");
+  legendBoxContainer.append("rect")
+    .attr("fill", "#eee")
+    .attr("width", HPViz_constants.legendBoxWidth)
+    .attr("height", HPViz_constants.legendBoxHeight);
+    //.attr("transform", "translate(" + "-30" + "," + (-15 - HPViz_constants.legendBoxHeight) + ")");
+
+  legendBoxContainer.append("text")
+    .attr("font-size", 30)
+    .text("Ratio of house prices to wages")
+    .attr('text-anchor', 'end')
+    .attr("transform", "translate(" + (HPViz_constants.legendBoxWidth - HPViz_constants.legendBoxMargin) + "," + (HPViz_constants.legendBoxMargin + 10) + ")")
+    .attr("dy", 0.3)
+    .call(wrap, (HPViz_constants.legendBoxWidth - 5));
+
+  var legendContainer = legendBoxContainer.append('g')
+    .attr("transform", "translate(" + HPViz_constants.legendBoxMargin + "," + (HPViz_constants.legendBoxWidth - 100) + ")");
 
   legendContainer.append("linearGradient")
     .attr("id", "linear-gradient")
     .attr("x1", "0%")
-    .attr("y1", "100%")
-    .attr("x2", "0%")
+    .attr("y1", "0%")
+    .attr("x2", "100%")
     .attr("y2", "0%")
       .selectAll('stop').data(
         HPViz_constants.colourScaleSkeleton.map(function(d) {
@@ -392,22 +432,26 @@ var bindAndDrawMap = function() {
     .style("fill", "url(#linear-gradient)");
 
   var legendScale = d3.scale.linear()
-                          .domain(HPViz_context.domainArray.map(function(d, i) {
-                              return (i/(HPViz_context.domainArray.length-1)) * (HPViz_context.domainArray[HPViz_context.domainArray.length - 1] - HPViz_context.domainArray[0]) + HPViz_context.domainArray[0];
-                            }).reverse())
-                          .range(HPViz_constants.colourScaleSkeleton.map(function(d) {return d.offset * HPViz_constants.legendHeight;}));
+    .domain(HPViz_context.domainArray.map(function(d, i) {
+        return (i/(HPViz_context.domainArray.length-1)) * (HPViz_context.domainArray[HPViz_context.domainArray.length - 1] - HPViz_context.domainArray[0]) + HPViz_context.domainArray[0];
+      }))
+    .range(HPViz_constants.colourScaleSkeleton.map(function(d) {return d.offset * HPViz_constants.legendWidth;}));
 
-  console.log(HPViz_constants.colourScaleSkeleton.map(function(d) {return d.offset * HPViz_constants.legendHeight;}));
-  console.log();
-
-  var legendAxis = d3.svg.axis().orient("left")
-                           .scale(legendScale)
-                           .tickValues(HPViz_context.domainArray);
+  var legendAxis = d3.svg.axis().orient("bottom")
+    .scale(legendScale)
+    .tickValues(HPViz_context.domainArray);
 
   var legendAxisGroup = legendContainer.append("g")
-                                      .attr('class', "legendAxisGroup")
-                                      //.attr("transform", "translate(" + 30 + "," + 50 + ")")
-                                      .call(legendAxis);
+    .attr('class', "legend-axis-group")
+    .attr("transform", "translate(" + 0 + "," + 10 + ")")
+    .call(legendAxis);
+
+  legendBoxContainer.append('text')
+    .attr('class', 'legend-year')
+    .attr('font-size', 35)
+    .attr('text-anchor', 'end')
+    .attr('fill', '#333')
+    .attr("transform", "translate(" + (HPViz_constants.legendBoxWidth - HPViz_constants.legendBoxMargin) + "," + (HPViz_constants.legendBoxHeight + 20 + HPViz_constants.legendBoxMargin) + ")");
 
   startAnimationLoop();
 
@@ -424,7 +468,8 @@ var fillColourOnRatio = function(ratio) {
 
 var startAnimationLoop = function() {
   HPViz_context.timer = window.setInterval(function() {
-    document.getElementById('year').innerHTML = HPViz_context.currentYear;
+    HPViz_context.svg.select('.legend-year').text(HPViz_context.currentYear);
+
     animationStep();
     if (HPViz_context.currentYear == HPViz_constants.endYear) {
       //Clear timer
