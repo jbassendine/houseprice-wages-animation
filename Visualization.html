@@ -21,6 +21,10 @@
   .lad-div {
     float:left;
   }
+  .chart {
+    clear: right;
+    width: 50%;
+  }
   .national-chart-path {
     stroke: black;
     stroke-width: 5;
@@ -40,18 +44,17 @@
   </style>
 </head>
 <body>
-  <div><div class="map-div"></div></div>
-  <div class="national-div">
-    <h2><span id='national'>Accept geolocation or click on map to get local data.</span></h2>
-    <div class="national-chart-div"></div>
-    <div><span class="headline-number national-housing-ratio"></span> years of the average full-time wage to buy an average house.</div>
-    <div><span class="headline-number national-mortgage-payoff-period"></span> years to pay off a mortgage on the average full-time wage.</div>
+  <div class="map-div"></div>
+  <div class="national-chart-div"></div>
+    <!-- <h2><span id='national'>Accept geolocation or click on map to get local data.</span></h2>
+    <div class="national-chart-div"> -->
+    <!-- <div><span class="headline-number national-housing-ratio"></span> years of the average full-time wage to buy an average house.</div>
+    <div><span class="headline-number national-mortgage-payoff-period"></span> years to pay off a mortgage on the average full-time wage.</div> -->
   </div>
-  <div class="lad-div">
-    <h2><span id='lad'>Accept geolocation or click on map to get local data.</span></h2>
-    <div class="lad-chart-div"></div>
-    <div><span class="headline-number lad-housing-ratio"></span> years of the average full-time local wage to buy an average house.</div>
-    <div><span class="headline-number lad-mortgage-payoff-period"></span> years to pay off a mortgage on the average full-time wage.</div>
+  <!-- <h2><span id='lad'>Accept geolocation or click on map to get local data.</span></h2> -->
+  <div class="lad-chart-div"></div>
+    <!-- <div><span class="headline-number lad-housing-ratio"></span> years of the average full-time local wage to buy an average house.</div>
+    <div><span class="headline-number lad-mortgage-payoff-period"></span> years to pay off a mortgage on the average full-time wage.</div> -->
   </div>
 </body>
 <script src='lib/d3.js'></script>

@@ -1,16 +1,15 @@
 
 var HPViz_constants = {
   mapWidth: 700,
-  mapHeight: 800,
+  mapHeight: 950,
   legendBoxHeight: 200,
   legendBoxWidth: 250,
   legendHeight: 10,
   legendWidth: 200,
   legendX: 700 - 320,
-  legendY: 70,
-  chartMargin: {top: 20, right: 20, bottom: 50, left: 70},
-  chartWidth: 330,
-  chartHeight: 230,
+  legendY: 20,
+  chartWidth: 630,
+  chartHeight: 330,
   stepTiming: 450,
   startYear: 1999,
   endYear: 2015,
@@ -21,8 +20,38 @@ var HPViz_constants = {
   ],
 };
 
-//Calculated but only one for each client, depend on other constants or client parameters like device screen heights etc.
-HPViz_constants.legendBoxMargin = (HPViz_constants.legendBoxWidth - HPViz_constants.legendWidth)/2;
+HPViz_constants.mapHeight           = window.screen.height - 150;
+HPViz_constants.mapWidth            = HPViz_constants.mapHeight * 0.72;
+
+
+HPViz_constants.legendBoxWidth         = HPViz_constants.mapWidth * 0.34;
+HPViz_constants.legendBoxMargin        = HPViz_constants.mapWidth * 0.05;
+HPViz_constants.legendBoxX             = HPViz_constants.mapWidth - HPViz_constants.legendBoxMargin - HPViz_constants.legendBoxWidth;
+HPViz_constants.legendBoxY             = HPViz_constants.mapHeight * 0.06;
+HPViz_constants.legendFontSize         = HPViz_constants.legendBoxWidth * 0.13;
+HPViz_constants.legendWidth            = HPViz_constants.legendBoxWidth * 0.8;
+HPViz_constants.legendX                = HPViz_constants.legendBoxWidth * 0.1;
+
+HPViz_constants.chartBoxHeight      = (HPViz_constants.mapHeight / 2) - 50;
+HPViz_constants.chartBoxWidth       = HPViz_constants.chartBoxHeight * 1.3;
+
+HPViz_constants.chartWidth          = HPViz_constants.chartBoxWidth * 0.8;
+HPViz_constants.chartMargin         = {
+  "left": HPViz_constants.chartBoxWidth * 0.15,
+  "top": 10
+};
+
+HPViz_constants.chartHeadingHeight  = HPViz_constants.chartBoxHeight * 0.15;
+HPViz_constants.chartHeight         = HPViz_constants.chartBoxHeight * 0.6;
+HPViz_constants.chartTextHeight     = HPViz_constants.chartBoxHeight * 0.25;
+
+HPViz_constants.chartHeadingY       = HPViz_constants.chartBoxHeight * 0;
+HPViz_constants.chartSheetY         = HPViz_constants.chartBoxHeight * 0.15;
+HPViz_constants.chartTextY          = HPViz_constants.chartBoxHeight * 0.75;
+
+//Calculated constants. Calculated once for each client, depend on other constants or client parameters like device screen heights etc.
+HPViz_constants.elementTotalNumber  = HPViz_constants.endYear - HPViz_constants.startYear + 1;
+HPViz_constants.elementWidth        = (HPViz_constants.chartWidth)/(HPViz_constants.elementTotalNumber);
 
 var HPViz_context = {
   svg: {},
@@ -45,7 +74,7 @@ d3.selection.prototype.moveToFront = function() {
   });
 };
 
-function wrap(text, width) {
+function wrap(text, width, dy) {
   text.each(function() {
     var text = d3.select(this),
         words = text.text().split(/\s+/).reverse(),
@@ -54,7 +83,6 @@ function wrap(text, width) {
         lineNumber = 0,
         lineHeight = 1.1, // ems
         y = text.attr("y"),
-        dy = parseFloat(text.attr("dy")),
         tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
     while (word = words.pop()) {
       line.push(word);
@@ -63,7 +91,7 @@ function wrap(text, width) {
         line.pop();
         tspan.text(line.join(" "));
         line = [word];
-        tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+        tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em").text(word);
       }
     }
   });
@@ -84,39 +112,68 @@ var initialize = function() {
 };
 
 var setupMap = function() {
-  var width = HPViz_constants.mapWidth;
-  var height = HPViz_constants.mapHeight;
 
-  HPViz_context.projection = d3.geo.albers()   // define our projection with parameters
+  HPViz_context.projection = d3.geo.mercator()   // define our projection with parameters
     //.precision()
-    .scale(5000)
-    //.translate([-800, 800])
+    .scale(3.6 * HPViz_constants.mapHeight)
+    .translate([HPViz_constants.mapWidth/2, HPViz_constants.mapHeight/2])
     .rotate(90)
-    .center([1, 56.5]);
+    .center([-2.217, 54.817]);
 
   HPViz_context.path = d3.geo.path().projection(HPViz_context.projection);
 
   HPViz_context.svg = d3.select('.map-div')
         .append('svg')
-        .attr('height', height)
-        .attr('width', width)
+        .attr('height', HPViz_constants.mapHeight)
+        .attr('width', HPViz_constants.mapWidth)
         .append('g');
 };
 
 var setupNationalChart = function() {
   //TODO: Chart height to client screen height
-  var nationalSVG = d3.select('.national-chart-div').append('svg')
-                     .attr('class', 'lad-chart-svg')
-                     .attr("width", HPViz_constants.chartWidth + HPViz_constants.chartMargin.left + HPViz_constants.chartMargin.right)
-                     .attr("height", HPViz_constants.chartHeight + HPViz_constants.chartMargin.top + HPViz_constants.chartMargin.bottom);
-  setupXAxisAndReturnScale(nationalSVG, 'national-chart-xaxis');
-  setupYAxisAndReturnScale(nationalSVG, 'national-chart-yaxis');
-  nationalSVG.append("g")
-            .attr("class", "national-chart-rects")
-            .attr("transform", "translate(" + (HPViz_constants.chartMargin.left - 1) + "," + HPViz_constants.chartMargin.top + ")");
-  nationalSVG.append("path")
-           .attr("class", "national-chart-path")
-           .attr("transform", "translate(" + (50) + "," + HPViz_constants.chartMargin.top + ")");
+  var nationalBoxSVG = d3.select('.national-chart-div').append('svg')
+    .attr('class', 'national-chart-box-svg')
+    .attr("width", HPViz_constants.chartBoxWidth)
+    .attr("height", HPViz_constants.chartBoxHeight);
+  var nationalHeadingSVG = nationalBoxSVG.append('g')
+    .attr('class', 'national-heading-group')
+    .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartHeadingY + ")")
+    .attr("width", HPViz_constants.chartWidth)
+    .attr("height", HPViz_constants.chartHeadingHeight);
+  nationalHeadingSVG.append('text')
+    .attr('class', 'national-heading-text')
+    .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartHeadingY + ")")
+    .attr("dominant-baseline", "text-before-edge")
+    .attr("font-size", (HPViz_constants.chartHeadingHeight - 15))
+    .attr("width", HPViz_constants.chartWidth)
+    .attr("height", HPViz_constants.chartHeadingHeight);
+  var nationalSheetSVG = nationalBoxSVG.append('g')
+    .attr('class', 'national-chart-sheet-group')
+    .attr("transform", "translate(" + HPViz_constants.chartMargin.left + "," + HPViz_constants.chartSheetY + ")")
+    .attr("width", HPViz_constants.chartWidth)
+    .attr("height", HPViz_constants.chartHeight);
+  var nationalTextSVG = nationalBoxSVG.append('svg')
+    .attr('class', 'national-text-svg')
+    .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartTextY + ")")
+    .attr("width", HPViz_constants.chartWidth)
+    .attr("height", HPViz_constants.chartTextHeight);
+  setupXAxisAndReturnScale(nationalSheetSVG, 'national-chart-xaxis');
+  setupYAxisAndReturnScale(nationalSheetSVG, 'national-chart-yaxis');
+  // var axisCoords = document.querySelector('.national-chart-yaxis .domain').getBoundingClientRect();
+  // var svgCoords = document.querySelector('.national-chart-svg').getBoundingClientRect();
+  // var chartOrigin = {
+  //   "top": (axisCoords.top - svgCoords.top),
+  //   "left": (axisCoords.right - svgCoords.left)
+  // };
+  var chartGroup = nationalSheetSVG.append("g")
+    .attr("class", "national-chart-group");
+    //.attr("transform", "translate(" + (chartOrigin.left) + "," + chartOrigin.top + ")");
+  chartGroup.append("g")
+    .attr("class", "national-chart-rects");
+    //.attr("transform", "translate(" + (0) + "," + 0 + ")");
+  chartGroup.append("path")
+   .attr("class", "national-chart-path")
+   .attr("transform", "translate(" + (HPViz_constants.elementWidth / 2) + "," + 0 + ")");
 };
 
 var updateNationalChart = function (ID) {
@@ -135,7 +192,7 @@ var updateNationalChart = function (ID) {
   retrieveChartDataById(ID, function(nationalDataRaw) {
     HPViz_context.nationalData = nationalDataRaw;
 
-    document.getElementById('national').innerHTML = nationalDataRaw.LADname;
+    document.getElementsByClassName('national-heading-text')[0].innerHTML = nationalDataRaw.LADname;
 
     // //Reformat for chart
     // nationalData = reformatChartDataForLineFct(nationalDataRaw);
@@ -152,8 +209,8 @@ var updateNationalChart = function (ID) {
 
     //Update line function
     HPViz_context.nationalLineFct = d3.svg.line()
-                .x(function(d) {return nationalXScale(d.year);})
-                .y(function(d) {return nationalYScale(d.ratio);});
+      .x(function(d) {return nationalXScale(d.year);})
+      .y(function(d) {return nationalYScale(d.ratio);});
 
     if (!HPViz_context.timer) {
       animationStep();
@@ -162,18 +219,51 @@ var updateNationalChart = function (ID) {
 };
 
 var setupLADChart = function() {
-  var LADSVG = d3.select('.lad-chart-div').append('svg')
-                     .attr('class', 'lad-chart-svg')
-                     .attr("width", HPViz_constants.chartWidth + HPViz_constants.chartMargin.left + HPViz_constants.chartMargin.right)
-                     .attr("height", HPViz_constants.chartHeight + HPViz_constants.chartMargin.top + HPViz_constants.chartMargin.bottom);
-  setupXAxisAndReturnScale(LADSVG, 'lad-chart-xaxis');
-  setupYAxisAndReturnScale(LADSVG, 'lad-chart-yaxis');
-  LADSVG.append("g")
-            .attr("class", "lad-chart-rects")
-            .attr("transform", "translate(" + (HPViz_constants.chartMargin.left - 1) + "," + HPViz_constants.chartMargin.top + ")");
-  LADSVG.append("path")
-           .attr("class", "lad-chart-path")
-           .attr("transform", "translate(" + (50) + "," + HPViz_constants.chartMargin.top + ")");
+  var LADBoxSVG = d3.select('.lad-chart-div').append('svg')
+    .attr('class', 'lad-chart-box-svg')
+    .attr("width", HPViz_constants.chartBoxWidth)
+    .attr("height", HPViz_constants.chartBoxHeight);
+  var LADHeadingSVG = LADBoxSVG.append('g')
+    .attr('class', 'lad-heading-group')
+    .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartHeadingY + ")")
+    .attr("width", HPViz_constants.chartWidth)
+    .attr("height", HPViz_constants.chartHeadingHeight);
+  LADHeadingSVG.append('text')
+    .attr('class', 'lad-heading-text')
+    .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartHeadingY + ")")
+    .attr("dominant-baseline", "text-before-edge")
+    .attr("font-size", (HPViz_constants.chartHeadingHeight - 15))
+    .attr("width", HPViz_constants.chartWidth)
+    .attr("height", HPViz_constants.chartHeadingHeight);
+  var LADSheetSVG = LADBoxSVG.append('g')
+    .attr('class', 'lad-chart-sheet-group')
+    .attr("transform", "translate(" + HPViz_constants.chartMargin.left + "," + HPViz_constants.chartSheetY + ")")
+    .attr("width", HPViz_constants.chartWidth)
+    .attr("height", HPViz_constants.chartHeight);
+  var LADTextSVG = LADBoxSVG.append('svg')
+    .attr('class', 'lad-text-svg')
+    .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartTextY + ")")
+    .attr("width", HPViz_constants.chartWidth)
+    .attr("height", HPViz_constants.chartTextHeight);
+  setupXAxisAndReturnScale(LADSheetSVG, 'lad-chart-xaxis');
+  setupYAxisAndReturnScale(LADSheetSVG, 'lad-chart-yaxis');
+  // var axisCoords = document.querySelector('.lad-chart-yaxis .domain').getBoundingClientRect();
+  // var svgCoords = document.querySelector('.lad-chart-sheet-group').getBoundingClientRect();
+  // var chartOrigin = {
+  //   "top": (axisCoords.top - svgCoords.top),
+  //   "left": (axisCoords.right - svgCoords.left)
+  // };
+  var chartGroup = LADSheetSVG.append("g")
+    .attr("class", "lad-chart-group");
+    //.attr("transform", "translate(" + (chartOrigin.left) + "," + chartOrigin.top + ")");
+
+  chartGroup.append("g")
+    .attr("class", "lad-chart-rects");
+    //.attr("transform", "translate(" + (- 1) + "," + 0 + ")");
+
+  chartGroup.append("path")
+    .attr("class", "lad-chart-path")
+    .attr("transform", "translate(" + (HPViz_constants.elementWidth / 2) + "," + 0 + ")");
 };
 
 var updateLADChart = function(SVGTargetElement) {
@@ -197,8 +287,7 @@ var updateLADChart = function(SVGTargetElement) {
   updateNationalChart(LADElementID);
 
   retrieveChartDataById(LADElementID, function(LADDataRaw) {
-    document.getElementById('lad').innerHTML = LADDataRaw.LADname;
-
+    document.getElementsByClassName('lad-heading-text')[0].innerHTML = LADDataRaw.LADname;
     HPViz_context.LADData = LADDataRaw;
 
     //Find max
@@ -207,7 +296,7 @@ var updateLADChart = function(SVGTargetElement) {
       return Number(d.ratio);
     });
 
-    var LADSVG = d3.select('.lad-chart-svg');
+    var LADSVG = d3.select('.lad-chart-sheet-group');
     var LADXScale = setupXAxisAndReturnScale(LADSVG, 'lad-chart-xaxis');
     var LADYScale = setupYAxisAndReturnScale(LADSVG, 'lad-chart-yaxis', max);
 
@@ -224,25 +313,25 @@ var updateLADChart = function(SVGTargetElement) {
 
 var setupXAxisAndReturnScale = function (LADSVG, inputClass) {
   var LADXScale = d3.scale.linear()
-                              .domain([HPViz_constants.startYear, HPViz_constants.endYear + 1])
-                              .range([0, HPViz_constants.chartWidth]);
+    .domain([HPViz_constants.startYear, HPViz_constants.endYear + 1])
+    .range([0, HPViz_constants.chartWidth]);
 
 
   var LADXAxis = d3.svg.axis().scale(LADXScale)
-                              .tickValues(d3.range(HPViz_constants.startYear, HPViz_constants.endYear + 2, 1))
-                              .tickFormat(d3.format("d"));
+    .tickValues(d3.range(HPViz_constants.startYear, HPViz_constants.endYear + 2, 1))
+    .tickFormat(d3.format("d"));
 
   if (!document.getElementsByClassName(inputClass).length) {
     var LADXAxisGroup = LADSVG.append("g")
-                                      .attr('class', inputClass)
-                                      .attr("transform", "translate(" + (HPViz_constants.chartMargin.left - 30) + "," + (HPViz_constants.chartHeight + HPViz_constants.chartMargin.top) + ")")
-                                      .call(LADXAxis)
-                                        .selectAll("text")
-                                      .attr("y", 0)
-                                      .attr("x", -50)
-                                      .attr("dy", ".35em")
-                                      .attr("transform", "rotate(-90)")
-                                      .style("text-anchor", "start");
+      .attr('class', inputClass)
+      .attr("transform", "translate(" + 0 + "," + (HPViz_constants.chartHeight) + ")")
+      .call(LADXAxis)
+        .selectAll("text")
+      .attr("y", 0)
+      .attr("x", -50)
+      .attr("dy", ".35em")
+      .attr("transform", "rotate(-90)")
+      .style("text-anchor", "start");
   }
   return LADXScale;
 };
@@ -250,18 +339,18 @@ var setupXAxisAndReturnScale = function (LADSVG, inputClass) {
 var setupYAxisAndReturnScale = function (SVG, inputClass, max) {
   if (!max) max = 7.25;
   var yScale = d3.scale.linear()
-                              .domain([0, max])
-                              .range([HPViz_constants.chartHeight, 0])
-                              .nice();
+    .domain([0, max])
+    .range([HPViz_constants.chartHeight, 0])
+    .nice();
 
   var yAxis = d3.svg.axis().orient("left")
-                           .scale(yScale);
+   .scale(yScale);
 
   if (!document.getElementsByClassName(inputClass).length) {
     var yAxisGroup = SVG.append("g")
-                                      .attr('class', inputClass)
-                                      .attr("transform", "translate(" + (HPViz_constants.chartMargin.left - 30) + "," + HPViz_constants.chartMargin.top + ")")
-                                      .call(yAxis);
+      .attr('class', inputClass)
+      //.attr("transform", "translate(" + (-6) + "," + 0 + ")")
+      .call(yAxis);
   } else {
     d3.select(".lad-chart-yaxis").call(yAxis);
   }
@@ -292,10 +381,10 @@ var findMapDataById = function(ID) {
 
 var retrieveChartDataById = function(ID, callbackFunction) {
   d3_queue.queue()
-         .defer(d3.json, 'data/LADs/' + ID + '.json')
-         .await(function(error, LADdataRaw) {
-           callbackFunction(LADdataRaw);
-         });
+   .defer(d3.json, 'data/LADs/' + ID + '.json')
+   .await(function(error, LADdataRaw) {
+     callbackFunction(LADdataRaw);
+   });
 };
 
 var processMapData = function(houseData, localDistricts) {
@@ -303,7 +392,7 @@ var processMapData = function(houseData, localDistricts) {
   HPViz_context.dataset = topojson.feature(localDistricts, localDistricts.objects.lad1).features;
 
   var min = 2,
-      max = 16,
+      max = 14,
       domainArray = [],
       rangeArray = [];
 
@@ -365,30 +454,10 @@ var reformatChartDataForLineFct = function(HDvalue) {
   return newHDvalue;
 };
 
-
-
-var bindAndDrawMap = function() {
-
-  HPViz_context.svg.append('g').attr('class', 'lad-container')
-    .selectAll('.localDistricts')
-    .data(HPViz_context.dataset)
-    .enter()
-    .append('path')
-    .attr('class', 'localDistricts')
-    .attr('id', function(d) {return d.id;})
-    .attr('d', HPViz_context.path)
-    .attr('fill', 'white')
-    .on("mouseover", function() {})
-    .on("mouseout", function() {})
-    .on("click", function(select) {
-      if (HPViz_context.currentlySelected.id !== this.id) {
-        updateLADChart(this);
-      }
-    });
-
+var drawLegend = function() {
   var legendBoxContainer = HPViz_context.svg.append("g")
     .attr("class", "legend-box-container")
-    .attr("transform", "translate(" + HPViz_constants.legendX + "," + HPViz_constants.legendY + ")");
+    .attr("transform", "translate(" + HPViz_constants.legendBoxX + "," + HPViz_constants.legendBoxY + ")");
 
   legendBoxContainer.append("rect")
     .attr("fill", "#eee")
@@ -397,15 +466,14 @@ var bindAndDrawMap = function() {
     //.attr("transform", "translate(" + "-30" + "," + (-15 - HPViz_constants.legendBoxHeight) + ")");
 
   legendBoxContainer.append("text")
-    .attr("font-size", 30)
-    .text("Ratio of house prices to wages")
+    .attr("font-size", HPViz_constants.legendFontSize)
+    .text("Ratio of average house prices to average wages")
     .attr('text-anchor', 'end')
-    .attr("transform", "translate(" + (HPViz_constants.legendBoxWidth - HPViz_constants.legendBoxMargin) + "," + (HPViz_constants.legendBoxMargin + 10) + ")")
-    .attr("dy", 0.3)
-    .call(wrap, (HPViz_constants.legendBoxWidth - 5));
+    .attr("transform", "translate(" + (HPViz_constants.legendBoxWidth - HPViz_constants.legendBoxMargin) + "," + (HPViz_constants.legendBoxMargin - 5) + ")")
+    .call(wrap, (HPViz_constants.legendBoxWidth - HPViz_constants.legendBoxMargin), 1.1);
 
   var legendContainer = legendBoxContainer.append('g')
-    .attr("transform", "translate(" + HPViz_constants.legendBoxMargin + "," + (HPViz_constants.legendBoxWidth - 100) + ")");
+    .attr("transform", "translate(" + HPViz_constants.legendX + "," + (HPViz_constants.legendBoxHeight * 0.75) + ")");
 
   legendContainer.append("linearGradient")
     .attr("id", "linear-gradient")
@@ -448,11 +516,33 @@ var bindAndDrawMap = function() {
 
   legendBoxContainer.append('text')
     .attr('class', 'legend-year')
-    .attr('font-size', 35)
+    .attr('font-size', 45)
     .attr('text-anchor', 'end')
     .attr('fill', '#333')
-    .attr("transform", "translate(" + (HPViz_constants.legendBoxWidth - HPViz_constants.legendBoxMargin) + "," + (HPViz_constants.legendBoxHeight + 20 + HPViz_constants.legendBoxMargin) + ")");
+    .attr("transform", "translate(" + (HPViz_constants.legendBoxWidth) + "," + (HPViz_constants.legendBoxHeight * 1.3 + HPViz_constants.legendBoxMargin) + ")");
 
+};
+
+var bindAndDrawMap = function() {
+
+  HPViz_context.svg.append('g').attr('class', 'lad-container')
+    .selectAll('.localDistricts')
+    .data(HPViz_context.dataset)
+    .enter()
+    .append('path')
+    .attr('class', 'localDistricts')
+    .attr('id', function(d) {return d.id;})
+    .attr('d', HPViz_context.path)
+    .attr('fill', 'white')
+    .on("mouseover", function() {})
+    .on("mouseout", function() {})
+    .on("click", function(select) {
+      if (HPViz_context.currentlySelected.id !== this.id) {
+        updateLADChart(this);
+      }
+    });
+
+  drawLegend();
   startAnimationLoop();
 
   var mapReadyEvent = new Event('mapready');
@@ -532,18 +622,14 @@ var animationStep = function() {
   //Test whether a local area has been selected, and a LAD JSON file returned and added as the LADData global
   if (Object.keys(HPViz_context.LADData).length !== 0) {
     console.log(HPViz_context.currentYear);
-    document.getElementsByClassName("national-housing-ratio")[0].textContent = findDataForYearFromJSONArray(HPViz_context.nationalData, HPViz_context.currentYear, "ratio");
-    document.getElementsByClassName("national-mortgage-payoff-period")[0].textContent = findDataForYearFromJSONArray(HPViz_context.nationalData, HPViz_context.currentYear, "mortgagePeriod");
+    //TODO: document.getElementsByClassName("national-housing-ratio")[0].textContent = findDataForYearFromJSONArray(HPViz_context.nationalData, HPViz_context.currentYear, "ratio");
+    //TODO: document.getElementsByClassName("national-mortgage-payoff-period")[0].textContent = findDataForYearFromJSONArray(HPViz_context.nationalData, HPViz_context.currentYear, "mortgagePeriod");
 
-    document.getElementsByClassName("lad-housing-ratio")[0].textContent = findDataForYearFromJSONArray(HPViz_context.LADData, HPViz_context.currentYear, "ratio");
-    document.getElementsByClassName("lad-mortgage-payoff-period")[0].textContent = findDataForYearFromJSONArray(HPViz_context.LADData, HPViz_context.currentYear, "mortgagePeriod");
-
-    var elementTotalNumber = HPViz_constants.endYear - HPViz_constants.startYear + 1;
-    var elementWidth = (HPViz_constants.chartWidth)/(elementTotalNumber);
-    //var elementCurrentNumber = HPViz_context.currentYear - HPViz_constants.startYear - 1;
+    //TODO: document.getElementsByClassName("lad-housing-ratio")[0].textContent = findDataForYearFromJSONArray(HPViz_context.LADData, HPViz_context.currentYear, "ratio");
+    //TODO: document.getElementsByClassName("lad-mortgage-payoff-period")[0].textContent = findDataForYearFromJSONArray(HPViz_context.LADData, HPViz_context.currentYear, "mortgagePeriod");
 
     var calculateElementNumber = function(year) {
-      return year - HPViz_constants.startYear - 1;
+      return year - HPViz_constants.startYear;
     };
 
     var nationalLineSegment = getLineSegment(HPViz_context.currentYear, HPViz_context.nationalData);
@@ -568,10 +654,10 @@ var animationStep = function() {
     LadRects.exit().remove();
     LadRects.enter().append('rect')
         .attr('class', "chart-rect")
-        .attr('height', 230)
-        .attr('width', (elementWidth))
+        .attr('height', HPViz_constants.chartHeight)
+        .attr('width', (HPViz_constants.elementWidth))
         .attr('x', function (d) {
-          var xDisp = (elementWidth * calculateElementNumber(d.year)) - (elementWidth / 2);
+          var xDisp = (HPViz_constants.elementWidth * calculateElementNumber(d.year));
           return xDisp;
         })
         .attr('y', 0)
@@ -584,8 +670,8 @@ var animationStep = function() {
       .duration(HPViz_constants.stepTiming)
       .attr('d', function() {
         return HPViz_context.LADLineFct(ladLineSegment.filter(function(element) {
-          if (isNaN(element.ratio)) return false;
-          else return true;
+          if (isNaN(element.ratio)) {return false;}
+          else {return true;}
         }));
       });
 
@@ -597,10 +683,10 @@ var animationStep = function() {
         });
     nationalRects.enter().append('rect')
         .attr('class', "chart-rect")
-        .attr('height', 230)
-        .attr('width', elementWidth)
+        .attr('height', HPViz_constants.chartHeight)
+        .attr('width', HPViz_constants.elementWidth)
         .attr('x', function (d) {
-          var xDisp = (elementWidth * calculateElementNumber(d.year)) - (elementWidth / 2);
+          var xDisp = (HPViz_constants.elementWidth * calculateElementNumber(d.year));
           return xDisp;
         })
         .attr('y', 0)
