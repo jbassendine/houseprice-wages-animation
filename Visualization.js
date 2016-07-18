@@ -1,3 +1,6 @@
+//TODO: Centre display, add figure(s) to right, check mortgage calcs, do zooming
+
+
 
 var HPViz_constants = {
   mapWidth: 700,
@@ -20,19 +23,22 @@ var HPViz_constants = {
   ],
 };
 
-HPViz_constants.mapHeight           = window.screen.height - 150;
+HPViz_constants.mapHeight           = window.screen.height * 0.95 - 50;
 HPViz_constants.mapWidth            = HPViz_constants.mapHeight * 0.72;
 
 
 HPViz_constants.legendBoxWidth         = HPViz_constants.mapWidth * 0.34;
+HPViz_constants.legendBoxHeight        = HPViz_constants.legendBoxWidth * 1.5;
 HPViz_constants.legendBoxMargin        = HPViz_constants.mapWidth * 0.05;
 HPViz_constants.legendBoxX             = HPViz_constants.mapWidth - HPViz_constants.legendBoxMargin - HPViz_constants.legendBoxWidth;
 HPViz_constants.legendBoxY             = HPViz_constants.mapHeight * 0.06;
-HPViz_constants.legendFontSize         = HPViz_constants.legendBoxWidth * 0.13;
+
+HPViz_constants.legendHeadingFontSize         = HPViz_constants.legendBoxWidth * 0.13;
+
 HPViz_constants.legendWidth            = HPViz_constants.legendBoxWidth * 0.8;
 HPViz_constants.legendX                = HPViz_constants.legendBoxWidth * 0.1;
 
-HPViz_constants.chartBoxHeight      = (HPViz_constants.mapHeight / 2) - 50;
+HPViz_constants.chartBoxHeight      = (HPViz_constants.mapHeight / 2) - 30;
 HPViz_constants.chartBoxWidth       = HPViz_constants.chartBoxHeight * 1.3;
 
 HPViz_constants.chartWidth          = HPViz_constants.chartBoxWidth * 0.8;
@@ -42,12 +48,14 @@ HPViz_constants.chartMargin         = {
 };
 
 HPViz_constants.chartHeadingHeight  = HPViz_constants.chartBoxHeight * 0.15;
-HPViz_constants.chartHeight         = HPViz_constants.chartBoxHeight * 0.6;
-HPViz_constants.chartTextHeight     = HPViz_constants.chartBoxHeight * 0.25;
+HPViz_constants.chartHeight         = HPViz_constants.chartBoxHeight * 0.65;
+//HPViz_constants.chartTextHeight     = HPViz_constants.chartBoxHeight * 0.25;
 
 HPViz_constants.chartHeadingY       = HPViz_constants.chartBoxHeight * 0;
 HPViz_constants.chartSheetY         = HPViz_constants.chartBoxHeight * 0.15;
-HPViz_constants.chartTextY          = HPViz_constants.chartBoxHeight * 0.75;
+//HPViz_constants.chartTextY          = HPViz_constants.chartBoxHeight * 0.75;
+
+HPViz_constants.chartAxisFontSize   = HPViz_constants.chartBoxHeight * 0.06;
 
 //Calculated constants. Calculated once for each client, depend on other constants or client parameters like device screen heights etc.
 HPViz_constants.elementTotalNumber  = HPViz_constants.endYear - HPViz_constants.startYear + 1;
@@ -152,11 +160,11 @@ var setupNationalChart = function() {
     .attr("transform", "translate(" + HPViz_constants.chartMargin.left + "," + HPViz_constants.chartSheetY + ")")
     .attr("width", HPViz_constants.chartWidth)
     .attr("height", HPViz_constants.chartHeight);
-  var nationalTextSVG = nationalBoxSVG.append('svg')
-    .attr('class', 'national-text-svg')
-    .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartTextY + ")")
-    .attr("width", HPViz_constants.chartWidth)
-    .attr("height", HPViz_constants.chartTextHeight);
+  // var nationalTextSVG = nationalBoxSVG.append('svg')
+  //   .attr('class', 'national-text-svg')
+  //   .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartTextY + ")")
+  //   .attr("width", HPViz_constants.chartWidth)
+  //   .attr("height", HPViz_constants.chartTextHeight);
   setupXAxisAndReturnScale(nationalSheetSVG, 'national-chart-xaxis');
   setupYAxisAndReturnScale(nationalSheetSVG, 'national-chart-yaxis');
   // var axisCoords = document.querySelector('.national-chart-yaxis .domain').getBoundingClientRect();
@@ -240,11 +248,11 @@ var setupLADChart = function() {
     .attr("transform", "translate(" + HPViz_constants.chartMargin.left + "," + HPViz_constants.chartSheetY + ")")
     .attr("width", HPViz_constants.chartWidth)
     .attr("height", HPViz_constants.chartHeight);
-  var LADTextSVG = LADBoxSVG.append('svg')
-    .attr('class', 'lad-text-svg')
-    .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartTextY + ")")
-    .attr("width", HPViz_constants.chartWidth)
-    .attr("height", HPViz_constants.chartTextHeight);
+  // var LADTextSVG = LADBoxSVG.append('svg')
+  //   .attr('class', 'lad-text-svg')
+  //   .attr("transform", "translate(" + 0 + "," + HPViz_constants.chartTextY + ")")
+  //   .attr("width", HPViz_constants.chartWidth)
+  //   .attr("height", HPViz_constants.chartTextHeight);
   setupXAxisAndReturnScale(LADSheetSVG, 'lad-chart-xaxis');
   setupYAxisAndReturnScale(LADSheetSVG, 'lad-chart-yaxis');
   // var axisCoords = document.querySelector('.lad-chart-yaxis .domain').getBoundingClientRect();
@@ -316,7 +324,6 @@ var setupXAxisAndReturnScale = function (LADSVG, inputClass) {
     .domain([HPViz_constants.startYear, HPViz_constants.endYear + 1])
     .range([0, HPViz_constants.chartWidth]);
 
-
   var LADXAxis = d3.svg.axis().scale(LADXScale)
     .tickValues(d3.range(HPViz_constants.startYear, HPViz_constants.endYear + 2, 1))
     .tickFormat(d3.format("d"));
@@ -328,9 +335,10 @@ var setupXAxisAndReturnScale = function (LADSVG, inputClass) {
       .call(LADXAxis)
         .selectAll("text")
       .attr("y", 0)
-      .attr("x", -50)
+      .attr("x", -(HPViz_constants.chartAxisFontSize * 2.70))
       .attr("dy", ".35em")
       .attr("transform", "rotate(-90)")
+      .attr("font-size", HPViz_constants.chartAxisFontSize)
       .style("text-anchor", "start");
   }
   return LADXScale;
@@ -350,7 +358,9 @@ var setupYAxisAndReturnScale = function (SVG, inputClass, max) {
     var yAxisGroup = SVG.append("g")
       .attr('class', inputClass)
       //.attr("transform", "translate(" + (-6) + "," + 0 + ")")
-      .call(yAxis);
+      .call(yAxis)
+        .selectAll("text")
+      .attr("font-size", HPViz_constants.chartAxisFontSize);
   } else {
     d3.select(".lad-chart-yaxis").call(yAxis);
   }
@@ -466,14 +476,23 @@ var drawLegend = function() {
     //.attr("transform", "translate(" + "-30" + "," + (-15 - HPViz_constants.legendBoxHeight) + ")");
 
   legendBoxContainer.append("text")
-    .attr("font-size", HPViz_constants.legendFontSize)
+    .attr("font-size", HPViz_constants.legendHeadingFontSize)
+    .attr("class", "legend-heading")
     .text("Ratio of average house prices to average wages")
     .attr('text-anchor', 'end')
     .attr("transform", "translate(" + (HPViz_constants.legendBoxWidth - HPViz_constants.legendBoxMargin) + "," + (HPViz_constants.legendBoxMargin - 5) + ")")
     .call(wrap, (HPViz_constants.legendBoxWidth - HPViz_constants.legendBoxMargin), 1.1);
 
+  legendBoxContainer.append('text')
+    .attr('class', 'legend-year')
+    .attr('font-size', (HPViz_constants.legendHeadingFontSize + 5))
+    .attr('text-anchor', 'end')
+    .attr('fill', '#333')
+    .attr("transform", "translate(" + (HPViz_constants.legendBoxWidth - HPViz_constants.legendBoxMargin) + "," + (HPViz_constants.legendBoxHeight * 0.65) + ")");
+
+
   var legendContainer = legendBoxContainer.append('g')
-    .attr("transform", "translate(" + HPViz_constants.legendX + "," + (HPViz_constants.legendBoxHeight * 0.75) + ")");
+    .attr("transform", "translate(" + HPViz_constants.legendX + "," + (HPViz_constants.legendBoxHeight * 0.8) + ")");
 
   legendContainer.append("linearGradient")
     .attr("id", "linear-gradient")
@@ -512,15 +531,9 @@ var drawLegend = function() {
   var legendAxisGroup = legendContainer.append("g")
     .attr('class', "legend-axis-group")
     .attr("transform", "translate(" + 0 + "," + 10 + ")")
-    .call(legendAxis);
-
-  legendBoxContainer.append('text')
-    .attr('class', 'legend-year')
-    .attr('font-size', 45)
-    .attr('text-anchor', 'end')
-    .attr('fill', '#333')
-    .attr("transform", "translate(" + (HPViz_constants.legendBoxWidth) + "," + (HPViz_constants.legendBoxHeight * 1.3 + HPViz_constants.legendBoxMargin) + ")");
-
+    .call(legendAxis)
+      .selectAll("text")
+    .attr("font-size", HPViz_constants.chartAxisFontSize);
 };
 
 var bindAndDrawMap = function() {
